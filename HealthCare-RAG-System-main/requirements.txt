@@ -1,0 +1,32 @@
+# --- Web Framework ---
+Flask==3.0.3
+Flask-Session==0.8.0
+Werkzeug==3.0.4
+Jinja2==3.1.4
+
+# --- Vector Database and Retrieval ---
+chromadb==0.5.11
+
+# --- Embeddings and ML ---
+sentence-transformers==3.0.1
+torch>=2.0.0
+transformers>=4.42.0
+numpy>=1.26.4
+pandas>=2.2.2
+scikit-learn>=1.5.0
+
+# --- Local LLM Client ---
+ollama==0.3.3
+requests==2.32.3
+
+# --- PDF Processing ---
+PyPDF2==3.0.1
+fpdf==1.7.2
+
+# --- Utilities ---
+tqdm==4.66.5
+python-dotenv==1.0.1
+
+# --- Optional (Recommended for smooth Flask + Dev experience) ---
+itsdangerous==2.2.0
+click==8.1.7

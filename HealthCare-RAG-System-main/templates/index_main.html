@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🩺 Medical RAG Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>⚙️</h2>
+      <button id="toggleSidebar" class="toggle-btn">☰</button>
+    </div>
+
+    <div class="control-group">
+      <button id="checkOllamaBtn">Check Ollama</button>
+      <button id="ingestBtn">Run Ingestion</button>
+    </div>
+
+    <div class="upload-section">
+      <h3>📂 Add Patient Record</h3>
+      <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" id="fileInput" name="file" accept="application/pdf">
+        <button type="submit">Upload & Ingest</button>
+      </form>
+    </div>
+
+    <div class="control-group">
+      <button id="clearChat">Clear Chat</button>
+      <button id="clearMemory">Clear Memory</button>
+      <button id="exitBtn" class="exit-btn">Exit App</button>
+    </div>
+
+    <div id="statusArea" class="status"></div>
+  </aside>
+
+  <!-- MAIN CHAT AREA -->
+  <main class="main">
+    <h1>💬 Conversational GenAI App for Medical Records</h1>
+
+    <div id="patientInfo" class="patient-info"></div>
+
+    <form id="chatForm">
+      <textarea id="question" placeholder="Ask about medical records..."></textarea><br>
+      <button type="submit" class="ask-btn">Ask</button>
+    </form>
+
+    <div id="chatArea" class="chat-area"></div>
+  </main>
+</div>
+
+<!-- Spinner Template -->
+<!--<div id="spinner" class="spinner hidden">
+  <div class="spinner-circle"></div>
+  <p>🤔 Looking into medical records...</p>
+</div>-->
+
+<!-- Spinner Template (with Search Icon) -->
+<div id="spinner" class="spinner hidden">
+  <div class="spinner-circle">
+    <!-- Simple magnifier icon -->
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+  </div>
+  <p>Searching medical records...</p>
+</div>
+
+<script>
+const sidebar = document.getElementById("sidebar");
+const toggleBtn = document.getElementById("toggleSidebar");
+toggleBtn.addEventListener("click", () => {
+  sidebar.classList.toggle("collapsed");
+  toggleBtn.textContent = sidebar.classList.contains("collapsed") ? "☰" : "×";
+});
+
+const statusArea = document.getElementById("statusArea");
+const chatArea = document.getElementById("chatArea");
+const questionField = document.getElementById("question");
+const patientInfo = document.getElementById("patientInfo");
+const spinner = document.getElementById("spinner");
+
+// ===== Helper: Show/Hide Spinner =====
+function showSpinner() {
+  spinner.classList.remove("hidden");
+}
+function hideSpinner() {
+  spinner.classList.add("hidden");
+}
+
+// ===== Check Ollama =====
+document.getElementById("checkOllamaBtn").onclick = async () => {
+  statusArea.innerHTML = "🔄 Checking Ollama...";
+  const res = await fetch("/check_ollama");
+  const data = await res.json();
+  statusArea.innerHTML = data.message;
+  statusArea.className = "status " + (data.status === "ok" ? "success" : "error");
+};
+
+// ===== Run Ingestion =====
+document.getElementById("ingestBtn").onclick = async () => {
+  statusArea.innerHTML = "📥 Running ingestion...";
+  const res = await fetch("/ingest", { method: "POST" });
+  const data = await res.json();
+  statusArea.innerHTML = data.message || data.error;
+  statusArea.className = "status " + (data.message ? "success" : "error");
+};
+
+// ===== Upload PDF =====
+document.getElementById("uploadForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const fileInput = document.getElementById("fileInput");
+  if (!fileInput.files.length) {
+    alert("Please select a PDF file.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+  statusArea.innerHTML = "📤 Uploading and ingesting...";
+  const res = await fetch("/upload", { method: "POST", body: formData });
+  const data = await res.json();
+  statusArea.innerHTML = data.message || data.error;
+  statusArea.className = "status " + (data.message ? "success" : "error");
+};
+
+// ===== Clear Chat =====
+document.getElementById("clearChat").onclick = () => {
+  chatArea.innerHTML = "";
+};
+
+// ===== Clear Memory =====
+document.getElementById("clearMemory").onclick = async () => {
+  const res = await fetch("/clear_memory", { method: "POST" });
+  const data = await res.json();
+  statusArea.innerHTML = data.message;
+  statusArea.className = "status success";
+  patientInfo.innerHTML = "";
+};
+
+// ===== Exit App =====
+document.getElementById("exitBtn").onclick = async () => {
+  if (confirm("Are you sure you want to exit the app?")) {
+    statusArea.innerHTML = "🛑 Shutting down...";
+    try {
+      const res = await fetch("/exit", { method: "POST" });
+      const data = await res.json();
+      statusArea.innerHTML = data.message || data.error;
+      setTimeout(() => {
+        window.open('', '_self', '');
+        window.close();
+      }, 1000);
+    } catch (err) {
+      console.error(err);
+      statusArea.innerHTML = "Error during shutdown.";
+    }
+  }
+};
+
+// ===== Chat Form =====
+document.getElementById("chatForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const question = questionField.value.trim();
+  if (!question) return;
+
+  const msg = document.createElement("div");
+  msg.classList.add("user-msg");
+  msg.innerHTML = `<b>You:</b> ${question}`;
+  chatArea.appendChild(msg);
+  questionField.value = "";
+
+  const resBox = document.createElement("div");
+  resBox.classList.add("bot-msg");
+  chatArea.appendChild(resBox);
+  chatArea.scrollTop = chatArea.scrollHeight;
+
+  // Show spinner while generating
+  showSpinner();
+
+  try {
+    const res = await fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ question })
+    });
+    const data = await res.json();
+
+    // Hide spinner when response received
+    hideSpinner();
+
+    if (data.error) {
+      resBox.innerHTML = `<span class='error'>Error: ${data.error}</span>`;
+    } else {
+      let sourcesHTML = "";
+      if (data.sources && data.sources.length > 0) {
+        sourcesHTML = `
+          <div class='sources'>
+            <b>📄 Sources used:</b>
+            <ul>${data.sources.map(s => `<li>${JSON.stringify(s)}</li>`).join("")}</ul>
+          </div>`;
+      }
+
+      resBox.innerHTML = `
+        <div class='answer-box'>
+          <b>Answer:</b> ${data.answer}
+          ${sourcesHTML}
+        </div>`;
+    }
+
+    if (data.current_patient) {
+      patientInfo.innerHTML = `<b>🧍 Current patient:</b> ${data.current_patient}`;
+    } else {
+      patientInfo.innerHTML = "";
+    }
+
+    chatArea.scrollTop = chatArea.scrollHeight;
+
+  } catch (err) {
+    hideSpinner();
+    console.error(err);
+    resBox.innerHTML = `<span class='error'>Request failed. Please try again.</span>`;
+  }
+};
+</script>
+
+</body>
+</html>
