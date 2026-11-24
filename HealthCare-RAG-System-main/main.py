@@ -1,5 +1,4 @@
 # # main.py
-
 import os
 import webbrowser
 import threading
